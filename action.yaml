@@ -1,0 +1,65 @@
+name: Job Cache
+description: |
+  Determine if the job has already run for the currently checked out files.
+author: Jack Smith <jack.je.smith@gmail.com>
+inputs:
+  prefix:
+    description: |
+      Optionally specify a prefix for the cache key. This allows namespacing
+      to avoid collisions, for example when caching multiple different jobs
+      on the same input files.
+    default: ''
+  paths:
+    description: |
+      The paths to include in the cache key calculation. This should cover the
+      full set of files which might influence whether the job passes or fails.
+      By default this includes all files, to be safe.
+
+      The format is a series of git pathspecs.
+
+      See https://git-scm.com/docs/gitglossary#Documentation/gitglossary.txt-aiddefpathspecapathspec
+      for details on globbing, excludes and more.
+
+      Note that it is recommended to include any GitHub workflow files, as
+      these can affect job outcomes.
+    default: ":/"  # https://git-scm.com/docs/gitglossary#Documentation/gitglossary.txt-top
+outputs:
+  sha:
+    description: |
+      The computed SHA-256 of checked-out files, filtered by the paths argument.
+    value: '${{ steps.compute-sha.outputs.sha }}'
+  key:
+    description: |
+      The computed cache key.
+    value: '${{ steps.compute-sha.outputs.keys }}'
+  passed:
+    description: |
+      Whether a previous run for identical files already passed. This can be
+      used to skip job subsequent steps or jobs.
+
+      Returns 'true' if an entry with the correct key exists in the cache,
+      otherwise returns 'false'.
+    value: '${{ steps.cache.outputs.cache-hit }}'
+runs:
+  using: composite
+  steps:
+    - id: compute-sha
+      name: Compute sha
+      shell: bash
+      run: |
+        sha256=$(
+          sha256sum <(
+            git ls-files \
+              -- ${{ inputs.paths }} \
+              | sort | uniq | xargs sha256sum
+          ) | cut -f 1 -d ' '
+        )
+        echo "sha=${sha256}" >> "${GITHUB_OUTPUT}"
+        echo "key=${{ inputs.prefix }}${sha256}" >> "${GITHUB_OUTPUT}"
+        touch job-cache.txt
+    - id: cache
+      uses: actions/cache@v3
+      with:
+        key: '${{ steps.compute-sha.outputs.key }}'
+        lookup-only: true
+        path: job-cache.txt
