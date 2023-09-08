@@ -23,6 +23,14 @@ inputs:
       Note that it is recommended to include any GitHub workflow files, as
       these can affect job outcomes.
     default: ":/"  # https://git-scm.com/docs/gitglossary#Documentation/gitglossary.txt-top
+  global:
+    description: |
+      Whether to share the cache between all branches (recommended). If set to
+      false, will only check for previous passes on the current branch, the
+      base branch (if a PR), and the repository's default branch.
+
+      When set to false, a github token is not necessary.
+    default: 'true'
 outputs:
   sha:
     description: |
@@ -39,7 +47,7 @@ outputs:
 
       Returns 'true' if an entry with the correct key exists in the cache,
       otherwise returns 'false'.
-    value: '${{ steps.cache.outputs.cache-hit }}'
+    value: ${{ inputs.global == 'true' && steps.check-cache.outputs.cache-hit || steps.cache.outputs.cache-hit }}
 runs:
   using: composite
   steps:
@@ -57,6 +65,20 @@ runs:
         echo "sha=${sha256}" >> "${GITHUB_OUTPUT}"
         echo "key=${{ inputs.prefix }}${sha256}" >> "${GITHUB_OUTPUT}"
         touch job-cache.txt
+    - id: check-cache
+      if: inputs.global == 'true'
+      name: Check if job previously passed
+      shell: bash
+      run: |
+        repoName=$(gh repo view --json nameWithOwner | jq -r '.nameWithOwner')
+        cacheHit=$(
+          gh api \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "repos/${repoName}/actions/caches?key="'${{ steps.compute-sha.outputs.key }}' \
+            | jq '.total_count != 0'
+        )
+        echo "cache-hit=${cacheHit}" >> "${GITHUB_OUTPUT}"
     - id: cache
       uses: actions/cache@v3
       with:

@@ -1,0 +1,22 @@
+name: test
+on:
+  workflow_dispatch: null
+  pull_request: null
+  push:
+    branches:
+      - 'main'
+
+jobs:
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install action-validator with asdf
+        uses: asdf-vm/actions/install@v2
+        with:
+          tool_versions: |
+            action-validator 0.5.3
+      - name: Validate action.yaml
+        run: |
+          action-validator --verbose action.yaml
