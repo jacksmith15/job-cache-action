@@ -26,7 +26,7 @@ jobs:
           make test
 ```
 
-> :information_source: The `GH_TOKEN` environment variable can also be provided directly to the action as a `github-token` input. This is necessary for the action to check for cache hits by default. If you'd prefer to avoid using a token, you can still use [branch-local caching](#branch-local-caching).
+> :information_source: The `GH_TOKEN` environment variable is necessary for the action to check for cache hits by default. If you'd prefer to avoid using a token, you can still use [branch-local caching](#branch-local-caching).
 
 ### Filtering input files
 

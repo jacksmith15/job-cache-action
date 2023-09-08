@@ -31,11 +31,6 @@ inputs:
 
       When set to false, a github token is not necessary.
     default: 'true'
-  github-token:
-    description: |
-      The GitHub token to use for checking cache hits. Not required if
-      global is set to false.
-    default: ''
 outputs:
   sha:
     description: |
@@ -72,12 +67,9 @@ runs:
         touch job-cache.txt
     - id: check-cache
       if: inputs.global == 'true'
-      env:
-        INPUT_GH_TOKEN: ${{ inputs.github-token }}
       name: Check if job previously passed
       shell: bash
       run: |
-        GH_TOKEN="${GH_TOKEN:=${INPUT_GH_TOKEN}}"
         repoName=$(gh repo view --json nameWithOwner | jq -r '.nameWithOwner')
         cacheHit=$(
           gh api \
