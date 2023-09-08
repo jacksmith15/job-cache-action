@@ -52,7 +52,7 @@ outputs:
 
       Returns 'true' if an entry with the correct key exists in the cache,
       otherwise returns 'false'.
-    value: '${{ inputs.global == 'true' && steps.check-cache.outputs.cache-hit || steps.cache.outputs.cache-hit }}'
+    value: ${{ inputs.global == 'true' && steps.check-cache.outputs.cache-hit || steps.cache.outputs.cache-hit }}
 runs:
   using: composite
   steps:
