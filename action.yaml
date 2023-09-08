@@ -23,6 +23,19 @@ inputs:
       Note that it is recommended to include any GitHub workflow files, as
       these can affect job outcomes.
     default: ":/"  # https://git-scm.com/docs/gitglossary#Documentation/gitglossary.txt-top
+  global:
+    description: |
+      Whether to share the cache between all branches (recommended). If set to
+      false, will only check for previous passes on the current branch, the
+      base branch (if a PR), and the repository's default branch.
+
+      When set to false, a github token is not necessary.
+    default: 'true'
+  github-token:
+    description: |
+      The GitHub token to use for checking cache hits. Not required if
+      global is set to false.
+    default: ''
 outputs:
   sha:
     description: |
@@ -39,7 +52,7 @@ outputs:
 
       Returns 'true' if an entry with the correct key exists in the cache,
       otherwise returns 'false'.
-    value: '${{ steps.check-cache.outputs.cache-hit }}'
+    value: '${{ inputs.global == 'true' && steps.check-cache.outputs.cache-hit || steps.cache.outputs.cache-hit }}'
 runs:
   using: composite
   steps:
@@ -58,9 +71,13 @@ runs:
         echo "key=${{ inputs.prefix }}${sha256}" >> "${GITHUB_OUTPUT}"
         touch job-cache.txt
     - id: check-cache
+      if: inputs.global == 'true'
+      env:
+        INPUT_GH_TOKEN: ${{ inputs.github-token }}
       name: Check if job previously passed
       shell: bash
       run: |
+        GH_TOKEN="${GH_TOKEN:=${INPUT_GH_TOKEN}}"
         repoName=$(gh repo view --json nameWithOwner | jq -r '.nameWithOwner')
         cacheHit=$(
           gh api \
@@ -70,10 +87,6 @@ runs:
             | jq '.total_count != 0'
         )
         echo "cache-hit=${cacheHit}" >> "${GITHUB_OUTPUT}"
-    # This ensures a post-step which populates that cache _after_ other steps
-    # have completed successfully. We don't use the `cache-hit` output from
-    # this step, because it only reports a cache-hit for keys produced on the
-    # current branch.
     - id: cache
       uses: actions/cache@v3
       with:

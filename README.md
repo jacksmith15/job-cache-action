@@ -12,7 +12,10 @@ The following example shows a simple testing job, which skips testing if tests h
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
+      - uses: actions/checkout@v3
       - id: job-cache
         name: Check job cache
         uses: jacksmith15/job-cache-action@v1
@@ -23,6 +26,8 @@ jobs:
           make test
 ```
 
+> :information_source: The `GH_TOKEN` environment variable can also be provided directly to the action as a `github-token` input. This is necessary for the action to check for cache hits by default. If you'd prefer to avoid using a token, you can still use [branch-local caching](#branch-local-caching).
+
 ### Filtering input files
 
 You can specify a reduced set of files to detect changes in to improve the cache hit rate. This allows skipping tests for a commit which doesn't affect the tests, e.g. documentation. In the following example, tests are skipped if they previously passed for a commit with identical Python files.
@@ -31,7 +36,10 @@ You can specify a reduced set of files to detect changes in to improve the cache
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
+      - uses: actions/checkout@v3
       - id: job-cache
         name: Check job cache
         uses: jacksmith15/job-cache-action@v1
@@ -56,7 +64,10 @@ You can namespace the cache keys using the `prefix` option. This allows multiple
 jobs:
   typecheck:
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
+      - uses: actions/checkout@v3
       - id: job-cache
         name: Check job cache
         uses: jacksmith15/job-cache-action@v1
@@ -87,9 +98,40 @@ jobs:
 
 > :memo: Note how the type-checker job uses different paths for the job cache. This means that a change in a `.pyi` file (type stubs), will re-run the type-checker but not the unit tests.
 
+
+### Branch-local caching
+
+By default the cache is shared between workflows from all branches. This allows tests to be skipped on `main` if they've already passed on a PR before merging (provided the merge was clean for the relevant files).
+
+If you'd prefer to re-run tests on `main`, you can set `global: 'false'` on the action. In this mode, workflows on branches will only detect previous passes from the current branch, the default branch, and the base branch if the workflow is running from a PR (following the [same rules as regular Actions Cache usage](https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows#restrictions-for-accessing-a-cache)).
+
+For example:
+
+```yaml
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - id: job-cache
+        name: Check job cache
+        uses: jacksmith15/job-cache-action@v1
+        with:
+          global: 'false'
+      - id: test
+        name: Run tests
+        if: steps.job-cache.passed == 'false'
+        run: |
+          make test
+```
+
+Using the action in local mode also allows the action to be used without a GitHub token configured.
+
 ## How does it work?
 
 Under-the-hood this is storing empty files in the [GitHub Actions Cache](https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows) when a job completes successfully. The key is computed as a SHA-256 of all the specified files.
+
+[Default restrictions on cross-branch cache access](https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows#restrictions-for-accessing-a-cache) are bypassed by querying the cache via the (index-only) REST API instead, since we only care about whether the key exists.
 
 GitHub Actions Cache usage limits are based on total size (10 GB) and there is no limit on the number of keys. Because this action doesn't store any data (just a blank placeholder file) it is unlikely to exceed that quota.
 
