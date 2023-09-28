@@ -2,6 +2,12 @@
 
 A GitHub action for detecting whether a job has already run for the checked out files.
 
+This can be used to avoid re-running tests you have already run, speeding up delivery. In particular, the following cases are supported:
+
+- Skipping tests on a revert commit
+- Skipping tests on a (clean) squash-merge
+- Skipping tests which only depend on a subset of files (e.g. different test types, or sub-projects of a mono-repo)
+
 ## Usage
 
 ### Basic usage
